@@ -1,0 +1,698 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Contract Security Guide</title>
+    <style>
+        @media print {
+            body { margin: 0; }
+            .page-break { page-break-before: always; }
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 40px;
+            background: white;
+            color: #333;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            border-bottom: 3px solid #32CD32;
+            padding-bottom: 20px;
+        }
+        
+        h1 {
+            color: #32CD32;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #666;
+            font-size: 1.2em;
+            font-weight: 300;
+        }
+        
+        h2 {
+            color: #2E7D32;
+            font-size: 1.8em;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            border-left: 4px solid #32CD32;
+            padding-left: 15px;
+        }
+        
+        h3 {
+            color: #388E3C;
+            font-size: 1.3em;
+            margin-top: 25px;
+            margin-bottom: 10px;
+        }
+        
+        .code-block {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-left: 4px solid #32CD32;
+            padding: 20px;
+            margin: 15px 0;
+            font-family: 'Courier New', Consolas, monospace;
+            font-size: 0.9em;
+            overflow-x: auto;
+            border-radius: 4px;
+        }
+        
+        .vulnerability {
+            background: #fff3cd;
+            border: 1px solid #ffeeba;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        
+        .solution {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-left: 4px solid #28a745;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        
+        .important {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-left: 4px solid #dc3545;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        
+        ul {
+            padding-left: 20px;
+        }
+        
+        li {
+            margin-bottom: 5px;
+        }
+        
+        .toc {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+        
+        .toc h3 {
+            margin-top: 0;
+            color: #32CD32;
+        }
+        
+        .toc a {
+            color: #2E7D32;
+            text-decoration: none;
+        }
+        
+        .toc a:hover {
+            text-decoration: underline;
+        }
+        
+        .footer {
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 2px solid #e9ecef;
+            text-align: center;
+            color: #666;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Smart Contract Security Guide</h1>
+        <p class="subtitle">Essential Strategies to Prevent Smart Contract Attacks</p>
+        <p class="subtitle">Comprehensive Protection Methods & Best Practices</p>
+    </div>
+
+    <div class="toc">
+        <h3>Table of Contents</h3>
+        <ol>
+            <li><a href="#reentrancy">Reentrancy Attacks</a></li>
+            <li><a href="#overflow">Integer Overflow/Underflow</a></li>
+            <li><a href="#access">Access Control</a></li>
+            <li><a href="#validation">Input Validation</a></li>
+            <li><a href="#oracle">Oracle Manipulation</a></li>
+            <li><a href="#flashloan">Flash Loan Attacks</a></li>
+            <li><a href="#frontrun">Front-Running Protection</a></li>
+            <li><a href="#practices">Best Practices</a></li>
+            <li><a href="#testing">Testing Strategy</a></li>
+            <li><a href="#audit">Audit Checklist</a></li>
+        </ol>
+    </div>
+
+    <h2 id="reentrancy">1. Reentrancy Attacks</h2>
+    
+    <div class="vulnerability">
+        <strong>Vulnerability:</strong> External calls before state changes allow malicious contracts to re-enter and drain funds.
+    </div>
+
+    <h3>Vulnerable Code:</h3>
+    <div class="code-block">
+function withdraw() external {
+    uint amount = balances[msg.sender];
+    (bool success, ) = msg.sender.call{value: amount}("");
+    require(success);
+    balances[msg.sender] = 0; // State change after external call
+}
+    </div>
+
+    <div class="solution">
+        <h3>Solutions:</h3>
+        
+        <h4>1. Checks-Effects-Interactions Pattern:</h4>
+        <div class="code-block">
+function withdraw() external {
+    uint amount = balances[msg.sender];
+    balances[msg.sender] = 0; // State change before external call
+    (bool success, ) = msg.sender.call{value: amount}("");
+    require(success);
+}
+        </div>
+
+        <h4>2. ReentrancyGuard (Recommended):</h4>
+        <div class="code-block">
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+
+contract MyContract is ReentrancyGuard {
+    function withdraw() external nonReentrant {
+        // function logic
+    }
+}
+        </div>
+    </div>
+
+    <div class="page-break"></div>
+
+    <h2 id="overflow">2. Integer Overflow/Underflow</h2>
+    
+    <div class="vulnerability">
+        <strong>Vulnerability:</strong> Arithmetic operations can wrap around, causing unexpected behavior.
+    </div>
+
+    <div class="solution">
+        <h3>Solutions:</h3>
+        
+        <h4>For Solidity < 0.8.0 - Use SafeMath:</h4>
+        <div class="code-block">
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+
+contract SafeContract {
+    using SafeMath for uint256;
+    
+    function add(uint256 a, uint256 b) public pure returns (uint256) {
+        return a.add(b); // Reverts on overflow
+    }
+}
+        </div>
+
+        <h4>For Solidity >= 0.8.0 - Built-in Protection:</h4>
+        <div class="code-block">
+// Solidity 0.8.0+ has built-in overflow protection
+uint256 result = a + b; // Automatically reverts on overflow
+
+// To allow overflow (if needed):
+unchecked {
+    uint256 result = a + b; // Will wrap around
+}
+        </div>
+    </div>
+
+    <h2 id="access">3. Access Control</h2>
+    
+    <div class="vulnerability">
+        <strong>Vulnerability:</strong> Unauthorized access to critical functions can compromise the entire contract.
+    </div>
+
+    <div class="solution">
+        <h3>Robust Access Control Implementation:</h3>
+        <div class="code-block">
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
+
+contract SecureContract is Ownable, AccessControl {
+    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+    
+    modifier onlyAdmin() {
+        require(hasRole(ADMIN_ROLE, msg.sender), "Not admin");
+        _;
+    }
+    
+    modifier onlyMinter() {
+        require(hasRole(MINTER_ROLE, msg.sender), "Not minter");
+        _;
+    }
+    
+    function criticalFunction() external onlyAdmin {
+        // Protected function
+    }
+    
+    function mint(address to, uint256 amount) external onlyMinter {
+        // Minting logic
+    }
+}
+        </div>
+    </div>
+
+    <div class="page-break"></div>
+
+    <h2 id="validation">4. Input Validation</h2>
+    
+    <div class="vulnerability">
+        <strong>Vulnerability:</strong> Invalid inputs can cause unexpected behavior or be exploited.
+    </div>
+
+    <div class="solution">
+        <h3>Comprehensive Input Validation:</h3>
+        <div class="code-block">
+function transfer(address to, uint256 amount) external {
+    require(to != address(0), "Invalid address");
+    require(to != address(this), "Cannot transfer to contract");
+    require(amount > 0, "Amount must be positive");
+    require(amount <= balances[msg.sender], "Insufficient balance");
+    require(amount <= MAX_TRANSFER_AMOUNT, "Amount exceeds limit");
+    
+    // Transfer logic
+    balances[msg.sender] -= amount;
+    balances[to] += amount;
+    
+    emit Transfer(msg.sender, to, amount);
+}
+
+function setPrice(uint256 _price) external onlyOwner {
+    require(_price >= MIN_PRICE && _price <= MAX_PRICE, "Price out of range");
+    require(_price != currentPrice, "Price unchanged");
+    
+    currentPrice = _price;
+    emit PriceUpdated(_price);
+}
+        </div>
+    </div>
+
+    <h2 id="oracle">5. Oracle Manipulation</h2>
+    
+    <div class="vulnerability">
+        <strong>Vulnerability:</strong> Single oracle sources can be manipulated, leading to incorrect price data.
+    </div>
+
+    <div class="solution">
+        <h3>Multi-Oracle Price Validation:</h3>
+        <div class="code-block">
+import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+
+contract PriceConsumer {
+    AggregatorV3Interface internal priceFeed1;
+    AggregatorV3Interface internal priceFeed2;
+    AggregatorV3Interface internal priceFeed3;
+    
+    uint256 public constant TOLERANCE = 5; // 5% tolerance
+    uint256 public constant STALENESS_THRESHOLD = 3600; // 1 hour
+    
+    function getPrice() public view returns (int256) {
+        int256 price1 = getLatestPrice(priceFeed1);
+        int256 price2 = getLatestPrice(priceFeed2);
+        int256 price3 = getLatestPrice(priceFeed3);
+        
+        // Validate prices are within acceptable range
+        require(isWithinTolerance(price1, price2), "Price deviation too high");
+        require(isWithinTolerance(price2, price3), "Price deviation too high");
+        
+        // Return median price
+        return median(price1, price2, price3);
+    }
+    
+    function getLatestPrice(AggregatorV3Interface priceFeed) 
+        internal view returns (int256) {
+        (
+            uint80 roundId,
+            int256 price,
+            uint256 startedAt,
+            uint256 updatedAt,
+            uint80 answeredInRound
+        ) = priceFeed.latestRoundData();
+        
+        require(price > 0, "Invalid price");
+        require(updatedAt > 0, "Round not complete");
+        require(block.timestamp - updatedAt <= STALENESS_THRESHOLD, "Price too stale");
+        
+        return price;
+    }
+}
+        </div>
+    </div>
+
+    <div class="page-break"></div>
+
+    <h2 id="flashloan">6. Flash Loan Attacks</h2>
+    
+    <div class="vulnerability">
+        <strong>Vulnerability:</strong> Large instant loans can manipulate prices and exploit arbitrage opportunities.
+    </div>
+
+    <div class="solution">
+        <h3>Flash Loan Protection Mechanisms:</h3>
+        
+        <h4>1. Time-Weighted Average Price (TWAP):</h4>
+        <div class="code-block">
+contract TWAPProtection {
+    struct PriceData {
+        uint256 price;
+        uint256 timestamp;
+    }
+    
+    PriceData[] public priceHistory;
+    uint256 public constant TWAP_PERIOD = 1 hours;
+    
+    function getTWAP() public view returns (uint256) {
+        uint256 timeWeightedSum = 0;
+        uint256 totalTime = 0;
+        uint256 cutoff = block.timestamp - TWAP_PERIOD;
+        
+        for (uint i = priceHistory.length - 1; i >= 0; i--) {
+            if (priceHistory[i].timestamp < cutoff) break;
+            
+            uint256 timeWeight = i == priceHistory.length - 1 ? 
+                block.timestamp - priceHistory[i].timestamp :
+                priceHistory[i + 1].timestamp - priceHistory[i].timestamp;
+                
+            timeWeightedSum += priceHistory[i].price * timeWeight;
+            totalTime += timeWeight;
+        }
+        
+        return totalTime > 0 ? timeWeightedSum / totalTime : 0;
+    }
+}
+        </div>
+
+        <h4>2. Commit-Reveal Scheme:</h4>
+        <div class="code-block">
+contract CommitReveal {
+    mapping(bytes32 => uint256) public commitments;
+    uint256 public constant REVEAL_DELAY = 1 hours;
+    
+    function commitAction(bytes32 commitment) external {
+        commitments[commitment] = block.timestamp;
+        emit ActionCommitted(msg.sender, commitment);
+    }
+    
+    function revealAction(uint256 nonce, uint256 action) external {
+        bytes32 commitment = keccak256(abi.encodePacked(msg.sender, nonce, action));
+        require(commitments[commitment] != 0, "Invalid commitment");
+        require(
+            block.timestamp >= commitments[commitment] + REVEAL_DELAY, 
+            "Reveal too early"
+        );
+        
+        delete commitments[commitment];
+        executeAction(action);
+    }
+}
+        </div>
+    </div>
+
+    <h2 id="frontrun">7. Front-Running Protection</h2>
+    
+    <div class="vulnerability">
+        <strong>Vulnerability:</strong> Malicious actors can observe pending transactions and front-run them for profit.
+    </div>
+
+    <div class="solution">
+        <h3>Anti-MEV Mechanisms:</h3>
+        <div class="code-block">
+contract AntiMEV {
+    mapping(address => uint256) public lastActionBlock;
+    mapping(address => uint256) public nonces;
+    
+    modifier antiMEV() {
+        require(block.number > lastActionBlock[msg.sender], "Same block action");
+        lastActionBlock[msg.sender] = block.number;
+        _;
+    }
+    
+    modifier withNonce(uint256 expectedNonce) {
+        require(nonces[msg.sender] == expectedNonce, "Invalid nonce");
+        nonces[msg.sender]++;
+        _;
+    }
+    
+    // Batch processing to reduce front-running
+    function batchExecute(bytes[] calldata calls) external {
+        for (uint i = 0; i < calls.length; i++) {
+            (bool success, ) = address(this).delegatecall(calls[i]);
+            require(success, "Batch call failed");
+        }
+    }
+}
+        </div>
+    </div>
+
+    <div class="page-break"></div>
+
+    <h2 id="practices">8. Best Practices</h2>
+
+    <h3>Security Tools & Libraries:</h3>
+    <div class="solution">
+        <ul>
+            <li><strong>Slither:</strong> Static analysis tool for Solidity</li>
+            <li><strong>Mythril:</strong> Security analysis platform</li>
+            <li><strong>Echidna:</strong> Property-based fuzzing</li>
+            <li><strong>Manticore:</strong> Symbolic execution tool</li>
+            <li><strong>OpenZeppelin:</strong> Battle-tested smart contract library</li>
+        </ul>
+    </div>
+
+    <h3>Development Practices:</h3>
+    <div class="code-block">
+// Always use established libraries
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
+
+contract SecureToken is ERC20, Ownable, Pausable {
+    // Circuit breaker implementation
+    bool public emergencyStop = false;
+    
+    modifier stopInEmergency() { 
+        require(!emergencyStop && !paused(), "Contract stopped"); 
+        _; 
+    }
+    
+    modifier onlyInEmergency() { 
+        require(emergencyStop || paused(), "Not in emergency"); 
+        _; 
+    }
+    
+    function emergencyStopContract() external onlyOwner {
+        emergencyStop = true;
+        _pause();
+        emit EmergencyStop();
+    }
+    
+    function resumeContract() external onlyOwner onlyInEmergency {
+        emergencyStop = false;
+        _unpause();
+        emit ContractResumed();
+    }
+    
+    // All critical functions should use circuit breaker
+    function transfer(address to, uint256 amount) 
+        public 
+        override 
+        stopInEmergency 
+        returns (bool) 
+    {
+        return super.transfer(to, amount);
+    }
+    
+    // Events for transparency
+    event EmergencyStop();
+    event ContractResumed();
+    event SecurityAlert(string alert, address indexed user);
+}
+    </div>
+
+    <div class="important">
+        <h3>Critical Security Principles:</h3>
+        <ul>
+            <li><strong>Principle of Least Privilege:</strong> Grant minimum necessary permissions</li>
+            <li><strong>Defense in Depth:</strong> Multiple layers of security</li>
+            <li><strong>Fail-Safe Defaults:</strong> Secure defaults when operations fail</li>
+            <li><strong>Economy of Mechanism:</strong> Keep designs simple and understandable</li>
+            <li><strong>Complete Mediation:</strong> Check every access attempt</li>
+        </ul>
+    </div>
+
+    <div class="page-break"></div>
+
+    <h2 id="testing">9. Testing Strategy</h2>
+
+    <div class="solution">
+        <h3>Comprehensive Test Suite:</h3>
+        <div class="code-block">
+const { expect } = require("chai");
+const { ethers } = require("hardhat");
+
+describe("Security Tests", function() {
+    let contract, owner, attacker, user;
+    
+    beforeEach(async function() {
+        [owner, attacker, user] = await ethers.getSigners();
+        const Contract = await ethers.getContractFactory("SecureContract");
+        contract = await Contract.deploy();
+    });
+    
+    describe("Reentrancy Protection", function() {
+        it("should prevent reentrancy attacks", async function() {
+            // Deploy malicious contract
+            const Attacker = await ethers.getContractFactory("ReentrancyAttacker");
+            const attackerContract = await Attacker.deploy(contract.address);
+            
+            // Attempt reentrancy attack
+            await expect(
+                attackerContract.attack()
+            ).to.be.revertedWith("ReentrancyGuard: reentrant call");
+        });
+    });
+    
+    describe("Access Control", function() {
+        it("should restrict admin functions", async function() {
+            await expect(
+                contract.connect(attacker).adminFunction()
+            ).to.be.revertedWith("AccessControl: account is missing role");
+        });
+        
+        it("should allow role-based access", async function() {
+            await contract.grantRole(ADMIN_ROLE, user.address);
+            await expect(
+                contract.connect(user).adminFunction()
+            ).to.not.be.reverted;
+        });
+    });
+    
+    describe("Input Validation", function() {
+        it("should reject invalid inputs", async function() {
+            await expect(
+                contract.transfer(ethers.constants.AddressZero, 100)
+            ).to.be.revertedWith("Invalid address");
+            
+            await expect(
+                contract.transfer(user.address, 0)
+            ).to.be.revertedWith("Amount must be positive");
+        });
+    });
+    
+    describe("Edge Cases", function() {
+        it("should handle boundary conditions", async function() {
+            // Test maximum values
+            const maxUint = ethers.constants.MaxUint256;
+            // Test minimum values
+            // Test overflow scenarios
+        });
+        
+        it("should maintain contract invariants", async function() {
+            // Test that total supply equals sum of all balances
+            // Test that contract state remains consistent
+        });
+    });
+    
+    describe("Gas Optimization", function() {
+        it("should not exceed gas limits", async function() {
+            const tx = await contract.expensiveFunction();
+            const receipt = await tx.wait();
+            expect(receipt.gasUsed).to.be.below(6000000); // Block gas limit
+        });
+    });
+});
+        </div>
+    </div>
+
+    <h2 id="audit">10. Audit Checklist</h2>
+
+    <div class="solution">
+        <h3>Pre-Deployment Security Checklist:</h3>
+        
+        <h4>Code Review:</h4>
+        <ul>
+            <li>✅ Multiple developer code reviews completed</li>
+            <li>✅ All functions have proper access controls</li>
+            <li>✅ Input validation on all external/public functions</li>
+            <li>✅ Reentrancy guards where needed</li>
+            <li>✅ Integer overflow/underflow protection</li>
+            <li>✅ Proper error handling and revert messages</li>
+        </ul>
+        
+        <h4>Testing:</h4>
+        <ul>
+            <li>✅ 100% test coverage achieved</li>
+            <li>✅ Fuzz testing completed</li>
+            <li>✅ Edge case testing done</li>
+            <li>✅ Integration testing with other contracts</li>
+            <li>✅ Gas optimization testing</li>
+        </ul>
+        
+        <h4>Security Analysis:</h4>
+        <ul>
+            <li>✅ Static analysis tools run (Slither, Mythril)</li>
+            <li>✅ Professional security audit completed</li>
+            <li>✅ All audit findings addressed</li>
+            <li>✅ Bug bounty program initiated</li>
+        </ul>
+        
+        <h4>Deployment Strategy:</h4>
+        <ul>
+            <li>✅ Testnet deployment and testing</li>
+            <li>✅ Gradual mainnet rollout plan</li>
+            <li>✅ Monitoring and alerting systems</li>
+            <li>✅ Emergency response procedures</li>
+            <li>✅ Upgrade mechanism (if applicable)</li>
+        </ul>
+    </div>
+
+    <div class="important">
+        <h3>Emergency Response Plan:</h3>
+        <ol>
+            <li><strong>Detection:</strong> Automated monitoring alerts</li>
+            <li><strong>Assessment:</strong> Rapid incident assessment team</li>
+            <li><strong>Response:</strong> Execute circuit breaker if needed</li>
+            <li><strong>Communication:</strong> Notify users and stakeholders</li>
+            <li><strong>Resolution:</strong> Deploy fixes or migration plan</li>
+            <li><strong>Post-mortem:</strong> Document lessons learned</li>
+        </ol>
+    </div>
+
+    <div class="footer">
+        <p><strong>Remember:</strong> Security is an ongoing process, not a one-time check. Stay updated with the latest security practices and regularly audit your contracts.</p>
+        <p>Generated on: <span id="currentDate"></span></p>
+    </div>
+
+    <script>
+        document.getElementById('currentDate').textContent = new Date().toLocaleDateString();
+        
+        // Add print functionality
+        function printToPDF() {
+            window.print();
+        }
+        
+        // Auto-print when page loads (for PDF generation)
+        window.onload = function() {
+            setTimeout(printToPDF, 1000);
+        };
+    </script>
+</body>
+</html>
